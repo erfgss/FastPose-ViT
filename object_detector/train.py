@@ -1,3 +1,4 @@
+from src.device import get_device
 # This file contains the main training script for the RF-DETR model on the SPEED dataset
 
 import argparse
@@ -7,20 +8,11 @@ from styleaug import StyleAugmentor
 
 # Anomaly detection disabled after fixing inplace operations
 
-# Fix torch.compile Docker UID issues by setting comprehensive cache directories
-os.environ.setdefault("TORCHINDUCTOR_CACHE_DIR", "/tmp/torchinductor_cache")
-os.environ.setdefault("TRITON_CACHE_DIR", "/tmp/triton_cache")
-os.environ.setdefault("PYTORCH_TRITON_CACHE_DIR", "/tmp/triton_cache")
-# Set user environment variables to avoid getpwuid lookups
-os.environ.setdefault("USER", "pytorch")
-os.environ.setdefault("LOGNAME", "pytorch")
-os.environ.setdefault("HOME", "/tmp")
-# Fix CUDA memory fragmentation issues
-os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
-from torch.amp import GradScaler
+from src.device import make_grad_scaler as GradScaler
 from object_detector.optimizer import SingleDeviceMuonWithAuxAdam
 import os
 import numpy as np
@@ -140,16 +132,9 @@ def train_model(
     logger.info("Starting training...")
 
     # Setup device - always use GPU if available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     logger.info(f"Using device: {device}")
 
-    # Enable basic CUDA optimizations
-    if device.type == "cuda":
-        torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.allow_tf32 = True
-        torch.backends.cuda.matmul.allow_tf32 = True
-        # Remove empty_cache() call to stabilize GPU power usage during training
-        logger.info("CUDA optimizations enabled")
 
     # Create output directory
     output_path = create_output_dir(output_dir)
@@ -296,15 +281,6 @@ def train_model(
     if hasattr(model, "return_all_queries"):
         model.return_all_queries = True
 
-    # Apply torch.compile unless disabled
-    if not no_compile_model:
-        try:
-            # With static training enabled, aot-autograd can be more stable
-            compile_mode = "max-autotune-no-cudagraphs"
-            model = torch.compile(model, mode=compile_mode)
-            logger.info("Model compiled with torch.compile")
-        except Exception as e:
-            logger.warning(f"torch.compile failed: {e}. Continuing with uncompiled model.")
 
     logger.info(f"Using direct prediction LW-DETR-{model_variant} model")
 
@@ -420,9 +396,9 @@ def train_model(
     # Initialize mixed precision scaler with optimized settings for power stability
     scaler = (
         GradScaler(
-            device="cuda",
+            device=device.type,
         )
-        if device.type == "cuda"
+        if device.type == "npu"
         else None
     )
     if scaler:
@@ -501,9 +477,6 @@ def train_model(
         logger.info(f"Resumed from epoch {start_epoch}")
 
     # Final preparation before training loop
-    if device.type == "cuda":
-        # Keep only reset_peak_memory_stats, remove empty_cache for power stability
-        torch.cuda.reset_peak_memory_stats()
     logger.info("Ready to start training")
 
     # Training loop

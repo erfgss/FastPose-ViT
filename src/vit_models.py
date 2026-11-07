@@ -463,6 +463,18 @@ class VisionTransformer(nn.Module):
 
         return x
 
+    def forward_all_features(self, x: torch.Tensor) -> torch.Tensor:
+        """Return CLS and patch tokens in one backbone pass for residual decoding."""
+        x = self._process_input(x)
+        x = torch.cat([self._get_class_tokens(x.shape[0]), x], dim=1)
+        return self.encoder(x)
+
+    def forward_patch_features(self, x: torch.Tensor) -> torch.Tensor:
+        """Encoded spatial tokens; original forward and checkpoint keys unchanged."""
+        x = self._process_input(x)
+        x = torch.cat([self._get_class_tokens(x.shape[0]), x], dim=1)
+        return self.encoder(x)[:, self.nb_class_tokens:]
+
     def _get_class_tokens(self, batch_size: int) -> torch.Tensor:
         """Get class tokens expanded for the given batch size.
 

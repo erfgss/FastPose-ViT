@@ -191,7 +191,7 @@ def train_epoch(
         model_inputs = prepare_model_input(images, model)
 
         use_amp = scaler is not None
-        with autocast("cuda", enabled=use_amp):
+        with autocast(device.type, enabled=use_amp):
             outputs = model(model_inputs)
 
             # Convert targets to appropriate format for LW-DETR loss
@@ -308,7 +308,7 @@ def val_epoch(
             # Forward pass with proper input format (NestedTensor for LW-DETR)
             model_inputs = prepare_model_input(images, model)
 
-            with autocast("cuda", enabled=device.type == "cuda"):
+            with autocast(device.type, enabled=device.type == "npu"):
                 outputs = model(model_inputs)
 
             # Store for AP metrics - always use inference-style behavior

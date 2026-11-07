@@ -25,7 +25,6 @@ import torch.nn.functional as F
 from torch.nn.init import xavier_uniform_, constant_
 
 from object_detector.LWDETR.lwdetr_ops.functions import (
-    MSDeformAttnFunction,
     ms_deform_attn_core_pytorch,
 )
 
@@ -53,13 +52,6 @@ class MSDeformAttn(nn.Module):
                 "d_model must be divisible by n_heads, but got {} and {}".format(d_model, n_heads)
             )
         _d_per_head = d_model // n_heads
-        # you'd better set _d_per_head to a power of 2 which is more efficient in our CUDA implementation
-        if not _is_power_of_2(_d_per_head):
-            warnings.warn(
-                "You'd better set d_model in MSDeformAttn to make the "
-                "dimension of each attention head a power of 2 "
-                "which is more efficient in our CUDA implementation."
-            )
 
         self.im2col_step = 64
 
@@ -178,32 +170,18 @@ class MSDeformAttn(nn.Module):
             )
         attention_weights = F.softmax(attention_weights, -1)
 
-        if self._export or value.dtype == torch.half:
-            value = (
-                value.transpose(1, 2)
-                .contiguous()
-                .view(N, self.n_heads, self.d_model // self.n_heads, Len_in)
-            )
-            # Use static shapes if available to avoid data-dependent tracing
-            if hasattr(self, "static_hw"):
-                value_spatial_shapes = self.static_hw
-            else:
-                value_spatial_shapes = input_spatial_shapes
-            output = ms_deform_attn_core_pytorch(
-                value, value_spatial_shapes, sampling_locations, attention_weights
-            )
+        value = (
+            value.transpose(1, 2)
+            .contiguous()
+            .view(N, self.n_heads, self.d_model // self.n_heads, Len_in)
+        )
+        # Use static shapes if available to avoid data-dependent tracing
+        if hasattr(self, "static_hw"):
+            value_spatial_shapes = self.static_hw
         else:
-            value = value.view(N, Len_in, self.n_heads, self.d_model // self.n_heads)
-            attention_weights = attention_weights.view(
-                N, Len_q, self.n_heads, self.n_levels, self.n_points
-            )
-            output = MSDeformAttnFunction.apply(
-                value,
-                input_spatial_shapes,
-                input_level_start_index,
-                sampling_locations,
-                attention_weights,
-                self.im2col_step,
-            )
+            value_spatial_shapes = input_spatial_shapes
+        output = ms_deform_attn_core_pytorch(
+            value, value_spatial_shapes, sampling_locations, attention_weights
+        )
         output = self.output_proj(output)
         return output

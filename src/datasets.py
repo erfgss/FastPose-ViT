@@ -115,8 +115,6 @@ class SPEEDDataset(Dataset):
         self.is_train_split = split == "train"
         self.is_matrix_format = rotation_format == "matrix"
 
-        # Cache Camera class reference to avoid repeated imports in __getitem__
-        self.Camera = Camera
 
         # Pre-compute normalization tensors to avoid repeated tensor creation
         self._norm_mean = None
@@ -163,7 +161,11 @@ class SPEEDDataset(Dataset):
         self._has_pixel_aug = self.is_train_split and not self.no_pixel_augmentation
 
         # Set up camera data class with caching optimizations
-        self.camera = Camera()
+        calibration_path = Path(self.dataset_root_dir) / "camera.json"
+        if dataset_name.startswith("SPEED_PLUS") and calibration_path.is_file():
+            self.camera = Camera.from_json(calibration_path)
+        else:
+            self.camera = Camera()
 
         # Cache camera constants for performance
         self._camera_fx = self.camera.fx
@@ -472,7 +474,7 @@ class SPEEDDataset(Dataset):
                 translation = translation_to_bbox_relative_translation(
                     translation.unsqueeze(0),
                     bbox_tensor.unsqueeze(0),
-                    self.Camera,
+                    self.camera,
                 ).squeeze(0)
             # Keep final bbox as tensor
             bbox = bbox_tensor

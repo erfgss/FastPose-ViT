@@ -1,0 +1,90 @@
+[
+  {
+    "epoch": 1,
+    "train_loss": 0.00310308743113031,
+    "seconds": 1.707580535672605,
+    "n": 1200,
+    "translation_m": 0.026799838694823847,
+    "rotation_deg": 0.49179502150031745,
+    "rotation_rad": 0.008583442370096842,
+    "relative_translation": 0.002387572688639921,
+    "speed_score": 0.010971015058736763
+  },
+  {
+    "epoch": 2,
+    "train_loss": 0.0030412068031728267,
+    "seconds": 1.7066130703315139,
+    "n": 1200,
+    "translation_m": 0.026819844092048396,
+    "rotation_deg": 0.49241366588439134,
+    "rotation_rad": 0.008594239751497904,
+    "relative_translation": 0.00239022278517344,
+    "speed_score": 0.010984462536671343
+  },
+  {
+    "epoch": 3,
+    "train_loss": 0.0030195161839947104,
+    "seconds": 1.6994714569300413,
+    "n": 1200,
+    "translation_m": 0.02676569162455659,
+    "rotation_deg": 0.4919945427096221,
+    "rotation_rad": 0.00858692467212677,
+    "relative_translation": 0.0023844190345425884,
+    "speed_score": 0.010971343706669358
+  },
+  {
+    "epoch": 4,
+    "train_loss": 0.0030116685992106797,
+    "seconds": 1.6980910515412688,
+    "n": 1200,
+    "translation_m": 0.02679192102252273,
+    "rotation_deg": 0.4919735398779244,
+    "rotation_rad": 0.008586558103561402,
+    "relative_translation": 0.0023871158026046637,
+    "speed_score": 0.010973673906166066
+  },
+  {
+    "epoch": 5,
+    "train_loss": 0.0029953273634115854,
+    "seconds": 1.695861498825252,
+    "n": 1200,
+    "translation_m": 0.026820096999411666,
+    "rotation_deg": 0.4920763114576358,
+    "rotation_rad": 0.008588351806004842,
+    "relative_translation": 0.002391894215791884,
+    "speed_score": 0.010980246021796727
+  },
+  {
+    "epoch": 6,
+    "train_loss": 0.0029903375295301277,
+    "seconds": 1.6919073024764657,
+    "n": 1200,
+    "translation_m": 0.02672671435381441,
+    "rotation_deg": 0.4911070848471137,
+    "rotation_rad": 0.008571435610453287,
+    "relative_translation": 0.00238115540804453,
+    "speed_score": 0.010952591018497817
+  },
+  {
+    "epoch": 7,
+    "train_loss": 0.0029795303754508494,
+    "seconds": 1.696039984934032,
+    "n": 1200,
+    "translation_m": 0.026718976489501074,
+    "rotation_deg": 0.4913186499566549,
+    "rotation_rad": 0.008575128118197124,
+    "relative_translation": 0.0023812039035662263,
+    "speed_score": 0.01095633202176335
+  },
+  {
+    "epoch": 8,
+    "train_loss": 0.0029739955114200713,
+    "seconds": 1.7051731143146753,
+    "n": 1200,
+    "translation_m": 0.026707461425709577,
+    "rotation_deg": 0.4915381836202277,
+    "rotation_rad": 0.008578959703445434,
+    "relative_translation": 0.002380825747744287,
+    "speed_score": 0.01095978545118972
+  }
+]

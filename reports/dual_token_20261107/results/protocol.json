@@ -1,0 +1,61 @@
+{
+  "configs": [
+    {
+      "name": "full",
+      "geometry": true,
+      "gates": true,
+      "loss": "aligned",
+      "wd": 0.0001
+    },
+    {
+      "name": "no_geometry",
+      "geometry": false,
+      "gates": true,
+      "loss": "aligned",
+      "wd": 0.0001
+    },
+    {
+      "name": "no_gates",
+      "geometry": true,
+      "gates": false,
+      "loss": "aligned",
+      "wd": 0.0001
+    },
+    {
+      "name": "disentangled",
+      "geometry": true,
+      "gates": true,
+      "loss": "disentangled",
+      "wd": 0.0001
+    },
+    {
+      "name": "no_weight_decay",
+      "geometry": true,
+      "gates": true,
+      "loss": "aligned",
+      "wd": 0.0
+    }
+  ],
+  "seeds": [
+    123,
+    456,
+    789
+  ],
+  "epochs": 8,
+  "batch_size": 64,
+  "lr": 5e-05,
+  "eta_min": 5e-06,
+  "precision": "FP32",
+  "augmentation": "none; frozen cached features",
+  "selection": "minimum validation SPEED per seed; select configuration by mean best validation across all seeds; representative seed fixed to123",
+  "baseline_sha256": "75ff5011f7242b37798f8d68716898d011ac7b6a18aede16c5e09a1bec51d0c6",
+  "stress_conditions": [
+    "clean",
+    "dark_0.5",
+    "bright_1.5",
+    "bbox_shift_10pct",
+    "bbox_shift_20pct"
+  ],
+  "cross_domain": "SPEED trained -> full SPEED+ real test, no target adaptation",
+  "test_selection": false
+}

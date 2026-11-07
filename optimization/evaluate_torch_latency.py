@@ -1,3 +1,5 @@
+from src.device import synchronize
+from src.device import get_device
 """PyTorch model latency evaluation on SPEED dataset."""
 
 import argparse
@@ -7,15 +9,6 @@ import time
 import numpy as np
 import torch
 
-# Fix torch.compile Docker UID issues by setting comprehensive cache directories
-os.environ.setdefault("TORCHINDUCTOR_CACHE_DIR", "/tmp/torchinductor_cache")
-os.environ.setdefault("TRITON_CACHE_DIR", "/tmp/triton_cache")
-os.environ.setdefault("PYTORCH_TRITON_CACHE_DIR", "/tmp/triton_cache")
-# Set user environment variables to avoid getpwuid lookups
-os.environ.setdefault("USER", "pytorch")
-os.environ.setdefault("LOGNAME", "pytorch")
-os.environ.setdefault("HOME", "/tmp")
-import torch._dynamo
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -39,7 +32,7 @@ def measure_latency(args: argparse.Namespace, bbox_json_path: str) -> None:
     logger, _ = setup_logging(args=args, base_filename="evaluate_torch_latency")
 
     # Set device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     logger.info(f"Using device: {device}")
 
     # If log_dir does not exist, create it
@@ -97,48 +90,6 @@ def measure_latency(args: argparse.Namespace, bbox_json_path: str) -> None:
     # Set model to evaluation mode
     model.eval()
 
-    # Apply torch.compile optimization if enabled
-    if args.enable_torch_compile:
-        logger.info("Applying torch.compile optimization...")
-        logger.info("Note: First few steps will be slower due to compilation warmup")
-
-        # Simple warmup for torch.compile
-        if device.type == "cuda":
-            logger.info("Performing model warmup for torch.compile...")
-            with torch.no_grad():
-                image_size = (
-                    VIT_MODELS[args.vit_model][3] if args.vit_model in VIT_MODELS else (224, 224)
-                )
-                dummy_input = torch.randn(args.batch_size, 3, *image_size, device=device)
-                try:
-                    _ = model(dummy_input)
-                    logger.info("Model warmup successful")
-                except Exception as e:
-                    logger.warning(f"Model warmup failed: {e}")
-
-        try:
-            # Enable error suppression for Docker environments
-            torch._dynamo.config.suppress_errors = True
-
-            model = torch.compile(model, mode="max-autotune")
-            logger.info("Model compiled with torch.compile (max-autotune mode)")
-        except (KeyError, RuntimeError, OSError) as e:
-            if "getpwuid" in str(e) or "uid not found" in str(e):
-                logger.warning(
-                    "torch.compile failed due to Docker UID issue (getpwuid error). "
-                    "Falling back to uncompiled model. Consider running Docker with "
-                    "-e USER=pytorch -e LOGNAME=pytorch for optimal performance."
-                )
-            elif "Triton" in str(e):
-                logger.warning(
-                    f"torch.compile failed due to Triton compilation issue: {e}. "
-                    "Falling back to uncompiled model."
-                )
-            else:
-                logger.warning(
-                    f"torch.compile failed with error: {e}. Falling back to uncompiled model."
-                )
-            # Continue with uncompiled model
 
     # Warmup phase
     if args.warmup_iterations > 0:
@@ -149,28 +100,22 @@ def measure_latency(args: argparse.Namespace, bbox_json_path: str) -> None:
                 if warmup_count >= args.warmup_iterations:
                     break
                 images = images.to(device)
-                if args.mixed_precision and device.type == "cuda":
-                    with torch.autocast("cuda", dtype=torch.float16):
+                if args.mixed_precision and device.type == "npu":
+                    with torch.autocast(device.type, dtype=torch.float16):
                         _ = model(images)
                 else:
                     _ = model(images)
                 warmup_count += 1
-                if device.type == "cuda":
-                    torch.cuda.synchronize()
+                if device.type == "npu":
+                    synchronize(device)
         logger.info("Warmup completed")
 
     # Clear cache for accurate memory measurements
-    if device.type == "cuda":
-        torch.cuda.empty_cache()
 
     # Measure latency
     logger.info("Measuring latency...")
     latencies = []
 
-    # Initialize CUDA events for GPU timing if enabled
-    if args.use_cuda_events and device.type == "cuda":
-        start_event = torch.cuda.Event(enable_timing=True)
-        end_event = torch.cuda.Event(enable_timing=True)
 
     with torch.inference_mode():
         for images, _, _, _ in tqdm(val_loader, desc="Computing latency"):
@@ -179,38 +124,22 @@ def measure_latency(args: argparse.Namespace, bbox_json_path: str) -> None:
 
             # Multiple timing runs per sample for statistical accuracy
             for _ in range(args.timing_runs_per_sample):
-                if args.use_cuda_events and device.type == "cuda":
-                    # GPU timing with CUDA events (more accurate)
-                    torch.cuda.synchronize()
-                    start_event.record()
+                if device.type == "npu":
+                    synchronize(device)
 
-                    if args.mixed_precision:
-                        with torch.autocast("cuda", dtype=torch.float16):
-                            _ = model(images)
-                    else:
+                start_time = time.perf_counter()
+
+                if args.mixed_precision and device.type == "npu":
+                    with torch.autocast(device.type, dtype=torch.float16):
                         _ = model(images)
-
-                    end_event.record()
-                    torch.cuda.synchronize()
-                    latency = start_event.elapsed_time(end_event)  # Already in milliseconds
                 else:
-                    # CPU timing fallback
-                    if device.type == "cuda":
-                        torch.cuda.synchronize()
+                    _ = model(images)
 
-                    start_time = time.perf_counter()
+                if device.type == "npu":
+                    synchronize(device)
 
-                    if args.mixed_precision and device.type == "cuda":
-                        with torch.autocast("cuda", dtype=torch.float16):
-                            _ = model(images)
-                    else:
-                        _ = model(images)
-
-                    if device.type == "cuda":
-                        torch.cuda.synchronize()
-
-                    end_time = time.perf_counter()
-                    latency = (end_time - start_time) * 1000  # Convert to milliseconds
+                end_time = time.perf_counter()
+                latency = (end_time - start_time) * 1000  # Convert to milliseconds
 
                 batch_latencies.append(latency)
 
@@ -237,10 +166,10 @@ def measure_latency(args: argparse.Namespace, bbox_json_path: str) -> None:
 
     # Performance configuration summary
     timing_method = (
-        "CUDA Events" if (args.use_cuda_events and device.type == "cuda") else "CPU Timing"
+        "Synchronized wall-clock timing"
     )
     precision = "Mixed (FP16)" if args.mixed_precision else "Full (FP32)"
-    compilation = "Enabled" if args.enable_torch_compile else "Disabled"
+    compilation = "Disabled (eager execution)"
 
     # Print comprehensive results
     logger.info("")
@@ -445,11 +374,6 @@ if __name__ == "__main__":
         type=int,
         default=3,
         help="Number of timing runs per sample for statistical accuracy",
-    )
-    parser.add_argument(
-        "--use_cuda_events",
-        action="store_true",
-        help="Use CUDA events for GPU timing (more accurate than CPU timing)",
     )
     parser.add_argument(
         "--mixed_precision",

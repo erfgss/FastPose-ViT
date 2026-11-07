@@ -1,0 +1,15 @@
+% Requires \usepackage{booktabs}
+\begin{tabular}{llrrr}
+\toprule
+Row & Method & $E_T$ (cm) $\downarrow$ & $E_R$ (deg) $\downarrow$ & SPEED $\times 10^3$ $\downarrow$ \\
+\midrule
+A0 & Original FastPose-ViT & 2.7033 & 0.49255 & 11.002960 \\
+B0 & Full residual dual Token & 2.6730 $\pm$ 0.0004 & 0.49093 $\pm$ 0.00013 & 10.950057 $\pm$ 0.002114 \\
+B1 & B0: without geometry & 2.6790 $\pm$ 0.0001 & 0.49123 $\pm$ 0.00008 & 10.960188 $\pm$ 0.001421 \\
+B2 & B0: without task gates & 2.6731 $\pm$ 0.0004 & 0.49110 $\pm$ 0.00011 & 10.952763 $\pm$ 0.002073 \\
+C0 & B0: split translation loss & 2.6686 $\pm$ 0.0003 & 0.49103 $\pm$ 0.00012 & 10.948600 $\pm$ 0.002225 \\
+D0 & B0: weight decay = 0 & 2.6730 $\pm$ 0.0004 & 0.49093 $\pm$ 0.00013 & 10.950057 $\pm$ 0.002114 \\
+D1 & B0: weight decay = 0.01 & 2.6730 $\pm$ 0.0004 & 0.49096 $\pm$ 0.00005 & 10.950541 $\pm$ 0.000855 \\
+\bottomrule
+\end{tabular}
+% A0 is fixed; remaining rows: mean +/- sample SD over three seeds.

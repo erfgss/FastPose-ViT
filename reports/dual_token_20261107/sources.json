@@ -1,0 +1,45 @@
+[
+  {
+    "file": "C:\\Users\\20824\\Desktop\\Hias\\2102.12145.pdf",
+    "sha256": "dceada2f6238a1b3ed47af2c2643b270d3b5280a24e158e005cd4d7aa8293770",
+    "pdf_pages_consulted": [
+      4,
+      5,
+      9
+    ]
+  },
+  {
+    "file": "C:\\Users\\20824\\Desktop\\Hias\\2212.13415.pdf",
+    "sha256": "a3a7e87ee2719ee51cbc433bc74ebf3836cb69873f74d8b502ef708d0c5d8dde",
+    "pdf_pages_consulted": [
+      4,
+      5,
+      6
+    ]
+  },
+  {
+    "file": "C:\\Users\\20824\\Desktop\\Hias\\FastPose-ViT_ A Vision Transformer for Real-Time Spacecraft Pose Estimation.pdf",
+    "sha256": "221c640dbc1b933486ce703b8a1b25adb9db949ab6d114137167c7b07572dcd9",
+    "pdf_pages_consulted": [
+      5,
+      7,
+      8
+    ]
+  },
+  {
+    "file": "C:\\Users\\20824\\Desktop\\Hias\\Machine Learning Spacecraft Pose Estimation with Realistic Illumination.pdf",
+    "sha256": "d86f0cb39c1cc8ee8a4a43c818633cb6f7c076a7f39aa7d7b551d88c030a8647",
+    "pdf_pages_consulted": [
+      16,
+      64
+    ]
+  },
+  {
+    "file": "C:\\Users\\20824\\Desktop\\Hias\\tesi.pdf",
+    "sha256": "8034279196bede8728d53ec5b75d129300e82e16eaa12f0bd60151252fef8511",
+    "pdf_pages_consulted": [
+      63,
+      64
+    ]
+  }
+]

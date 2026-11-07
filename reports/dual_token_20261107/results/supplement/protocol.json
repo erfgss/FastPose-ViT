@@ -1,0 +1,27 @@
+{
+  "configs": [
+    {
+      "name": "weight_decay_0p01",
+      "geometry": true,
+      "gates": true,
+      "loss": "aligned",
+      "wd": 0.01
+    }
+  ],
+  "seeds": [
+    123,
+    456,
+    789
+  ],
+  "epochs": 8,
+  "batch_size": 64,
+  "lr": 5e-05,
+  "eta_min": 5e-06,
+  "precision": "FP32",
+  "augmentation": "none; frozen cached features",
+  "selection": "Supplemental validation-only positive control; main model already locked and unchanged",
+  "baseline_sha256": "75ff5011f7242b37798f8d68716898d011ac7b6a18aede16c5e09a1bec51d0c6",
+  "stress_conditions": [],
+  "cross_domain": null,
+  "test_selection": false
+}

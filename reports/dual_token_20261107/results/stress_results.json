@@ -1,0 +1,152 @@
+[
+  {
+    "condition": "clean",
+    "model": "baseline",
+    "n": 1200,
+    "translation_m": 0.02307728780496594,
+    "rotation_deg": 0.4490962305077661,
+    "rotation_rad": 0.007838207880655925,
+    "relative_translation": 0.0021362395068414723,
+    "speed_score": 0.009974447387497396
+  },
+  {
+    "condition": "clean",
+    "model": "full_seed123",
+    "n": 1200,
+    "translation_m": 0.022853493116538934,
+    "rotation_deg": 0.44916259717920143,
+    "rotation_rad": 0.007839366197586059,
+    "relative_translation": 0.0021180782413451503,
+    "speed_score": 0.00995744443893121
+  },
+  {
+    "condition": "clean",
+    "model": "selected_seed123",
+    "n": 1200,
+    "translation_m": 0.022793281635749736,
+    "rotation_deg": 0.4491284348497027,
+    "rotation_rad": 0.007838769952456156,
+    "relative_translation": 0.00211307856503178,
+    "speed_score": 0.009951848517487937
+  },
+  {
+    "condition": "dark_0.5",
+    "model": "baseline",
+    "n": 1200,
+    "translation_m": 0.06884096603345824,
+    "rotation_deg": 0.7954752382262184,
+    "rotation_rad": 0.013883662025133768,
+    "relative_translation": 0.006696686308138548,
+    "speed_score": 0.020580348333272318
+  },
+  {
+    "condition": "dark_0.5",
+    "model": "full_seed123",
+    "n": 1200,
+    "translation_m": 0.06816614500343955,
+    "rotation_deg": 0.796463486913579,
+    "rotation_rad": 0.013900910218556722,
+    "relative_translation": 0.006631542039540364,
+    "speed_score": 0.020532452258097085
+  },
+  {
+    "condition": "dark_0.5",
+    "model": "selected_seed123",
+    "n": 1200,
+    "translation_m": 0.06824489142939759,
+    "rotation_deg": 0.7964204225708621,
+    "rotation_rad": 0.013900158603986105,
+    "relative_translation": 0.006638578144241667,
+    "speed_score": 0.020538736748227773
+  },
+  {
+    "condition": "bright_1.5",
+    "model": "baseline",
+    "n": 1200,
+    "translation_m": 0.07469427810458001,
+    "rotation_deg": 0.8620646990485862,
+    "rotation_rad": 0.015045867363611857,
+    "relative_translation": 0.006337141272282073,
+    "speed_score": 0.02138300863589393
+  },
+  {
+    "condition": "bright_1.5",
+    "model": "full_seed123",
+    "n": 1200,
+    "translation_m": 0.07522450718051307,
+    "rotation_deg": 0.8636927429391504,
+    "rotation_rad": 0.015074282089869181,
+    "relative_translation": 0.006390811005427773,
+    "speed_score": 0.021465093095296955
+  },
+  {
+    "condition": "bright_1.5",
+    "model": "selected_seed123",
+    "n": 1200,
+    "translation_m": 0.07508951224356375,
+    "rotation_deg": 0.8638097782305785,
+    "rotation_rad": 0.015076324741045633,
+    "relative_translation": 0.00637875820231784,
+    "speed_score": 0.021455082943363474
+  },
+  {
+    "condition": "bbox_shift_10pct",
+    "model": "baseline",
+    "n": 1200,
+    "translation_m": 0.02979953203937233,
+    "rotation_deg": 0.5497244057884858,
+    "rotation_rad": 0.00959450085957845,
+    "relative_translation": 0.002685229409198655,
+    "speed_score": 0.012279730268777106
+  },
+  {
+    "condition": "bbox_shift_10pct",
+    "model": "full_seed123",
+    "n": 1200,
+    "translation_m": 0.029633638369802307,
+    "rotation_deg": 0.5503644172810132,
+    "rotation_rad": 0.009605671167373658,
+    "relative_translation": 0.002671164066662944,
+    "speed_score": 0.012276835234036602
+  },
+  {
+    "condition": "bbox_shift_10pct",
+    "model": "selected_seed123",
+    "n": 1200,
+    "translation_m": 0.02966069490328664,
+    "rotation_deg": 0.5504518778533352,
+    "rotation_rad": 0.009607197642326355,
+    "relative_translation": 0.0026729068584093814,
+    "speed_score": 0.012280104500735736
+  },
+  {
+    "condition": "bbox_shift_20pct",
+    "model": "baseline",
+    "n": 1200,
+    "translation_m": 0.15926221020893233,
+    "rotation_deg": 2.4183313155246173,
+    "rotation_rad": 0.042207843859990435,
+    "relative_translation": 0.014911131288348164,
+    "speed_score": 0.0571189751483386
+  },
+  {
+    "condition": "bbox_shift_20pct",
+    "model": "full_seed123",
+    "n": 1200,
+    "translation_m": 0.1586379875811205,
+    "rotation_deg": 2.4242912930597766,
+    "rotation_rad": 0.042311865091323855,
+    "relative_translation": 0.014853873281936103,
+    "speed_score": 0.05716573837325996
+  },
+  {
+    "condition": "bbox_shift_20pct",
+    "model": "selected_seed123",
+    "n": 1200,
+    "translation_m": 0.1587931489321636,
+    "rotation_deg": 2.424804035360769,
+    "rotation_rad": 0.042320814132690426,
+    "relative_translation": 0.014865702757924737,
+    "speed_score": 0.057186516890615165
+  }
+]

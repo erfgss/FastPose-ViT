@@ -1,0 +1,45 @@
+{
+  "baseline_validation": {
+    "n": 1200,
+    "translation_m": 0.027032678323618407,
+    "rotation_deg": 0.4925537075296739,
+    "rotation_rad": 0.008596683939297994,
+    "relative_translation": 0.002406275951125281,
+    "speed_score": 0.011002959890423275
+  },
+  "summary": [
+    {
+      "config": "full",
+      "mean_speed": 0.010950056727670016,
+      "std_speed": 2.1142044098642123e-06,
+      "change_vs_baseline_percent": -0.4808084668135981
+    },
+    {
+      "config": "no_geometry",
+      "mean_speed": 0.010960187991446824,
+      "std_speed": 1.42094970472199e-06,
+      "change_vs_baseline_percent": -0.3887308451762994
+    },
+    {
+      "config": "no_gates",
+      "mean_speed": 0.01095276332910948,
+      "std_speed": 2.0730253872778804e-06,
+      "change_vs_baseline_percent": -0.4562096182635811
+    },
+    {
+      "config": "disentangled",
+      "mean_speed": 0.01094859998438955,
+      "std_speed": 2.2245865982864434e-06,
+      "change_vs_baseline_percent": -0.4940480250322232
+    },
+    {
+      "config": "no_weight_decay",
+      "mean_speed": 0.010950056727670016,
+      "std_speed": 2.1142044098642123e-06,
+      "change_vs_baseline_percent": -0.4808084668135981
+    }
+  ],
+  "selected_config": "disentangled",
+  "representative_seed": 123,
+  "selection_completed_before_test": true
+}

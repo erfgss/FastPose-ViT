@@ -1,3 +1,4 @@
+from src.geometry_decoder import GeometryDualTokenDecoder
 # This file contains the models used in this project
 
 import warnings
@@ -172,6 +173,11 @@ class FastPoseViT(nn.Module):
         dropout_rate: float = 0.0,
         use_residual: bool = True,
         no_mlp: bool = False,
+        pose_decoder: str = "baseline",
+        decoder_dim: int = 256,
+        decoder_heads: int = 4,
+        decoder_layers: int = 2,
+        decoder_interaction: bool = True,
     ):
         """
         Model initialization
@@ -191,6 +197,23 @@ class FastPoseViT(nn.Module):
             no_mlp (bool, optional): Whether to skip MLP layers and use direct projection only. Defaults to False.
         """
         super().__init__()
+        if pose_decoder not in ("baseline", "geometry_dual_token", "geometry_dual_residual"):
+            raise ValueError(f"Unknown pose_decoder: {pose_decoder}")
+        if pose_decoder in ("geometry_dual_token", "geometry_dual_residual") and (
+            vit_model.startswith("convnext") or out_dim_translation != 3 or out_dim_rotation != 6
+        ):
+            raise ValueError("Geometry decoder requires a ViT backbone and 3+6 outputs")
+        self.pose_decoder = pose_decoder
+        self.backbone_frozen = False
+        self.model_config = dict(
+            vit_model=vit_model, num_hidden_layers=num_hidden_layers,
+            hidden_layer_dim=hidden_layer_dim, out_dim_translation=out_dim_translation,
+            out_dim_rotation=out_dim_rotation, merge_outputs=merge_outputs,
+            nb_class_tokens=nb_class_tokens, use_layer_norm=use_layer_norm,
+            dropout_rate=dropout_rate, use_residual=use_residual, no_mlp=no_mlp,
+            pose_decoder=pose_decoder, decoder_dim=decoder_dim, decoder_heads=decoder_heads,
+            decoder_layers=decoder_layers, decoder_interaction=decoder_interaction,
+        )
 
         if vit_model not in VIT_MODELS:
             raise ValueError(
@@ -217,7 +240,7 @@ class FastPoseViT(nn.Module):
 
             if vit_weights:
                 # Load custom weights
-                state_dict = torch.load(vit_weights)
+                state_dict = torch.load(vit_weights, map_location="cpu", weights_only=True)
                 adapted_state_dict = self._adapt_state_dict_for_nb_class_tokens(
                     state_dict, nb_class_tokens
                 )
@@ -266,7 +289,20 @@ class FastPoseViT(nn.Module):
         self.merge_outputs = merge_outputs
         self.no_mlp = no_mlp
 
-        if no_mlp:
+        if pose_decoder in ("geometry_dual_token", "geometry_dual_residual"):
+            self.decoder = GeometryDualTokenDecoder(
+                backbone_output_dim // nb_class_tokens, decoder_dim, decoder_heads,
+                decoder_layers, dropout_rate, decoder_interaction,
+            )
+            if pose_decoder == "geometry_dual_residual":
+                if not no_mlp or not merge_outputs:
+                    raise ValueError("Residual mode preserves the merged linear baseline; use --no_mlp --merge_outputs")
+                self.output = nn.Linear(backbone_output_dim, 9)
+                self.register_buffer("residual_scale", torch.tensor([.02, .02, .1, .2, .2, .2, .2, .2, .2]))
+                for head in (self.decoder.translation_head, self.decoder.rotation_head):
+                    nn.init.zeros_(head[-1].weight)
+                    nn.init.zeros_(head[-1].bias)
+        elif no_mlp:
             # Direct projection without MLP layers
             if merge_outputs:
                 out_dim = out_dim_translation + out_dim_rotation
@@ -354,7 +390,7 @@ class FastPoseViT(nn.Module):
 
         return state_dict
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, geometry: torch.Tensor | None = None) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass of the model
 
@@ -364,6 +400,13 @@ class FastPoseViT(nn.Module):
         Returns:
             torch.Tensor: Output tensor
         """
+        if self.pose_decoder == "geometry_dual_residual":
+            tokens = self.backbone.forward_all_features(x)
+            return self.forward_residual_features(tokens, geometry)
+        if self.pose_decoder == "geometry_dual_token":
+            patches = self.backbone.forward_patch_features(x)
+            translation, rotation = self.decoder(patches, geometry)
+            return torch.cat([translation, rotation], dim=-1) if self.merge_outputs else (translation, rotation)
         if self.backbone_type == "vit":
             x = self.backbone(x)
         else:  # ConvNeXt
@@ -376,7 +419,65 @@ class FastPoseViT(nn.Module):
         else:
             return self.translation(x), self.rotation(x)
 
-    def load_from_pretrained(self, path: str) -> None:
+    def forward_residual_features(self, tokens, geometry):
+        """Frozen-feature training and ordinary inference share this exact path."""
+        n = self.backbone.nb_class_tokens
+        baseline = self.output(tokens[:, :n].flatten(1))
+        t, r = self.decoder(tokens[:, n:], geometry)
+        correction = torch.tanh(torch.cat([t, r], dim=-1)) * self.residual_scale
+        return baseline + correction
+
+    def initialize_residual_from_baseline(self, path):
+        if self.pose_decoder != "geometry_dual_residual":
+            raise ValueError("This initialization requires residual decoder mode")
+        checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+        state = checkpoint.get("model_state_dict", checkpoint)
+        state = {("backbone." + k[4:] if k.startswith("vit.") else k): v for k, v in state.items()}
+        # Require exactly the pretrained backbone + merged linear head. Check
+        # before loading so unrelated checkpoints cannot silently initialize it.
+        expected = {k for k in self.state_dict() if not k.startswith("decoder.") and k != "residual_scale"}
+        if set(state) != expected:
+            raise ValueError("Expected complete merged-linear baseline checkpoint")
+        result = self.load_state_dict(state, strict=False)
+        assert not result.unexpected_keys
+        assert all(k.startswith("decoder.") or k == "residual_scale" for k in result.missing_keys)
+        self.set_backbone_trainable(False)
+        self.output.requires_grad_(False)
+
+    def set_backbone_trainable(self, trainable: bool) -> None:
+        """Freeze for decoder pretraining, or unfreeze for joint fine-tuning."""
+        self.backbone_frozen = not trainable
+        self.backbone.requires_grad_(trainable)
+        self.backbone.train(self.training and trainable)
+
+    def train(self, mode: bool = True):
+        super().train(mode)
+        if self.backbone_frozen:
+            self.backbone.eval()
+        return self
+
+    @classmethod
+    def from_checkpoint(cls, path: str):
+        """Reconstruct a new decoder model from its saved architecture metadata.
+
+        Legacy baseline weights have no metadata; construct the original model
+        explicitly and use load_from_pretrained for those checkpoints.
+        """
+        checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+        if "model_config" not in checkpoint:
+            raise ValueError("Legacy checkpoint: construct FastPoseViT with explicit baseline options")
+        config = dict(checkpoint["model_config"])
+        original_name = config["vit_model"]
+        # Full saved weights are sufficient; do not download backbone weights.
+        untrained_name = original_name + "_no_weights"
+        if untrained_name in VIT_MODELS:
+            config["vit_model"] = untrained_name
+        model = cls(**config)
+        model.model_config["vit_model"] = original_name
+        model.load_state_dict(checkpoint["model_state_dict"], strict=True)
+        return model
+
+    def load_from_pretrained(self, path: str, backbone_only: bool = False) -> None:
         """
         Load model weights from a pretrained model
 
@@ -386,7 +487,29 @@ class FastPoseViT(nn.Module):
         Returns:
             None
         """
-        state_dict = torch.load(path, map_location="cpu", weights_only=True)
+        checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+        state_dict = checkpoint.get("model_state_dict", checkpoint)
+        if backbone_only and self.pose_decoder == "geometry_dual_residual":
+            raise ValueError("Use initialize_residual_from_baseline to retain the trained pose head")
+        if backbone_only:
+            # Explicit warm-start: never silently ignore incompatible pose heads.
+            backbone = {k.split(".", 1)[1]: v for k, v in state_dict.items()
+                        if k.startswith(("vit.", "backbone."))}
+            if not backbone:
+                backbone = dict(state_dict)
+            backbone = {k: v for k, v in backbone.items() if not k.startswith("heads.")}
+            if self.backbone_type == "vit":
+                backbone = self._adapt_state_dict_for_nb_class_tokens(
+                    backbone, self.backbone.class_token.shape[1])
+            self.backbone.load_state_dict(backbone, strict=True)
+            return
+        saved_config = checkpoint.get("model_config")
+        if saved_config is not None:
+            for key in ("pose_decoder", "decoder_dim", "decoder_heads", "decoder_layers",
+                        "decoder_interaction", "vit_model", "nb_class_tokens",
+                        "merge_outputs", "out_dim_rotation"):
+                if saved_config.get(key) != self.model_config.get(key):
+                    raise ValueError(f"Checkpoint config mismatch for {key}; use matching model options")
 
         # Check if loading full FastPoseViT model state dict
         if "backbone.class_token" in state_dict or "backbone.features.0.0.weight" in state_dict:
@@ -422,4 +545,7 @@ class FastPoseViT(nn.Module):
         Returns:
             None
         """
-        torch.save(self.state_dict(), path)
+        if self.pose_decoder == "baseline":
+            torch.save(self.state_dict(), path)
+        else:
+            torch.save({"model_state_dict": self.state_dict(), "model_config": self.model_config}, path)

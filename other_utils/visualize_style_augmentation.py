@@ -35,7 +35,7 @@ def tensor_to_numpy_image(tensor):
     return tensor.permute(1, 2, 0).cpu().numpy()
 
 
-def visualize_augmentation_pipeline(dataset_root_dir, num_samples=4, device="cuda"):
+def visualize_augmentation_pipeline(dataset_root_dir, num_samples=4, device="cpu"):
     """
     Visualize the complete augmentation pipeline
 
@@ -240,7 +240,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--device",
         type=str,
-        default="cuda" if torch.cuda.is_available() else "cpu",
+        default="cpu",
         help="Device for style augmentation",
     )
 

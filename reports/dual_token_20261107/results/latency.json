@@ -1,0 +1,26 @@
+[
+  {
+    "model": "baseline",
+    "batch": 1,
+    "warmup": 20,
+    "iterations": 100,
+    "median_ms": 3.2662502489984035,
+    "p95_ms": 3.279655147343874
+  },
+  {
+    "model": "full_seed123",
+    "batch": 1,
+    "warmup": 20,
+    "iterations": 100,
+    "median_ms": 4.448109772056341,
+    "p95_ms": 4.477228177711368
+  },
+  {
+    "model": "selected_seed123",
+    "batch": 1,
+    "warmup": 20,
+    "iterations": 100,
+    "median_ms": 4.449082538485527,
+    "p95_ms": 4.476968199014664
+  }
+]

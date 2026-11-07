@@ -1,3 +1,5 @@
+from src.geometry_decoder import add_decoder_arguments, decoder_kwargs, forward_pose
+from src.device import get_device
 # This script evaluates the FastPoseViT model on the SPEED dataset
 
 import argparse
@@ -32,7 +34,7 @@ def evaluate(args: argparse.Namespace, bbox_json_path: str) -> None:
     logger, _ = setup_logging(args, base_filename="eval")
 
     # Set device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     logger.info(f"Using device: {device}")
 
     # If log_dir does not exist, create it
@@ -78,20 +80,11 @@ def evaluate(args: argparse.Namespace, bbox_json_path: str) -> None:
         dropout_rate=args.dropout_rate,
         use_residual=args.use_residual,
         no_mlp=args.no_mlp,
+        **decoder_kwargs(args),
     ).to(device)
 
     # Load model weights
-    checkpoint = torch.load(args.model_weights, map_location=device, weights_only=True)
-    if "model_state_dict" in checkpoint:
-        state_dict = checkpoint["model_state_dict"]
-    else:
-        state_dict = checkpoint
-    # Remap legacy "vit." prefix to "backbone."
-    state_dict = {
-        k.replace("vit.", "backbone.", 1) if k.startswith("vit.") else k: v
-        for k, v in state_dict.items()
-    }
-    model.load_state_dict(state_dict)
+    model.load_from_pretrained(args.model_weights)
 
     logger.info(f"Loaded model weights from {args.model_weights}")
 
@@ -140,12 +133,12 @@ def evaluate(args: argparse.Namespace, bbox_json_path: str) -> None:
 
             # Forward pass
             if merge_outputs:
-                output = model(images)
+                output = forward_pose(model, images, bbox, test_dataset.camera)
                 # Split output into translations and rotations
                 pred_translations = output[:, :3]
                 pred_rotations = output[:, 3:]
             else:
-                pred_translations, pred_rotations = model(images)
+                pred_translations, pred_rotations = forward_pose(model, images, bbox, test_dataset.camera)
 
             if args.rotation_format == "matrix":
                 pred_rotations = process_rotation(pred_rotations, args.rotation_format)
@@ -541,6 +534,7 @@ if __name__ == "__main__":
         help="Convert images to grayscale (replicated as 3-channel for model compatibility)",
     )
 
+    add_decoder_arguments(parser)
     args = parser.parse_args()
 
     # Set dataset_root_dir based on dataset choice if not specified

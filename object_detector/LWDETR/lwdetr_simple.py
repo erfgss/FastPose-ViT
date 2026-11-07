@@ -1,3 +1,4 @@
+from src.device import get_device
 # Simplified LW-DETR implementation for single satellite detection
 # Uses the original LW-DETR with single query modification
 
@@ -27,7 +28,7 @@ def get_lwdetr_model(variant="tiny", num_classes=2, num_queries=1):
         class Args:
             def __init__(self):
                 # Model architecture
-                self.device = "cuda" if torch.cuda.is_available() else "cpu"
+                self.device = str(get_device())
                 self.num_classes = num_classes
                 self.num_queries = num_queries  # Single query for single object
                 self.dataset_file = "satellite"  # Custom dataset

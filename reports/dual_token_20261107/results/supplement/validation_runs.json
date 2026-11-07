@@ -1,0 +1,38 @@
+[
+  {
+    "name": "weight_decay_0p01_seed123",
+    "config": "weight_decay_0p01",
+    "seed": 123,
+    "best_epoch": 6,
+    "n": 1200,
+    "translation_m": 0.026732535367118546,
+    "rotation_deg": 0.49098636125353373,
+    "rotation_rad": 0.008569328586260477,
+    "relative_translation": 0.0023820240738101953,
+    "speed_score": 0.010951352660070673
+  },
+  {
+    "name": "weight_decay_0p01_seed456",
+    "config": "weight_decay_0p01",
+    "seed": 456,
+    "best_epoch": 6,
+    "n": 1200,
+    "translation_m": 0.026731343739205233,
+    "rotation_deg": 0.49090098388890857,
+    "rotation_rad": 0.008567838470141092,
+    "relative_translation": 0.002381810612193173,
+    "speed_score": 0.010949649082334265
+  },
+  {
+    "name": "weight_decay_0p01_seed789",
+    "config": "weight_decay_0p01",
+    "seed": 789,
+    "best_epoch": 6,
+    "n": 1200,
+    "translation_m": 0.02672518026389298,
+    "rotation_deg": 0.4909853481088069,
+    "rotation_rad": 0.008569310903549194,
+    "relative_translation": 0.002381309012874529,
+    "speed_score": 0.010950619916423723
+  }
+]

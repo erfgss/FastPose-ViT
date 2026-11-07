@@ -16,7 +16,7 @@ STYLE_AUG_AVAILABLE = True
 def show_training_samples(dataset_root_dir="SPEED_FIXED/", num_samples=2):
     """Show actual training samples with different augmentation settings"""
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     print(f"Using device: {device}")
     print(f"StyleAugmentor available: {STYLE_AUG_AVAILABLE}")
 

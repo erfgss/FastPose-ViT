@@ -1,0 +1,21 @@
+{
+  "sha256": {
+    "/data/FastPose-ViT/src/models.py": "ab91cc9760c521a3224d2efcb54ee0cd9647fc46d1c4f952582a4758bbafe65a",
+    "/data/FastPose-ViT/src/vit_models.py": "f1f747f6053e2ba1e36da18d3ec3b6b10fcc005da565ff8b5bb1a780e6ed6e9b",
+    "/data/FastPose-ViT/src/geometry_decoder.py": "56682a63e609f1dc22ea70478d1c0a3a29543daa95ffa3b24fd2d6caa51051b6",
+    "/data/FastPose-ViT/src/datasets.py": "146ae6ee8b08e97d92b1591be6bc295b1d03423178e85ee750c17da167654c7d",
+    "/data/FastPose-ViT/src/camera.py": "0eac00a57af6a3e1d519d2f9c9804b08c34daebc21e5445b34107ad2b032927e",
+    "/data/FastPose-ViT/src/metrics.py": "8ae030c4353f175fbe4fb82642777fd35a75c2c0a3d619298630f8b83b618f6f",
+    "/data/FastPose-ViT/src/utils.py": "7e854d62d459f69cf3e95ad5049b5498fd31f4c6fc5933ea85723041f0691845",
+    "/data/FastPose-ViT/scripts/run_literature_suite.py": "8aa64b739fe36078d7e37daf26262ac4197563de57985309342f2e5938f154be",
+    "/data/datasets/SPEED_FIXED/train.json": "2a71055a3b2875a55c9d1238818def689fe5b500a2fa837ad044023eb8c53a78",
+    "/data/datasets/SPEED_FIXED/val.json": "e4031acc984fcd5b024b51cc7557af9db7d1e793b0e3d4618b16231af5218ab7",
+    "/data/datasets/SPEED_FIXED/test.json": "73ae60fd0ba695fc056581b73056109ff7c675f221a2f7c59140eb959255e1f4",
+    "/data/datasets/SPEED_FIXED/speed_bbox_annotations.json": "a665cacf99575d69765782c384ac1eba7bfefc97de5df897e202d1baf0bab0b1",
+    "/data/datasets/SPEED_PLUS_FIXED/test.json": "d3ef0333cf924724b4ab95194ae570e464a024db2e35477e39087cd68ea2d7e6",
+    "/data/datasets/SPEED_PLUS_FIXED/camera.json": "996bd50a83991f8dc11da9f4afc0a6e609d62eb532014a4256f3974f14e46558",
+    "/data/datasets/SPEED_PLUS_FIXED/speed_plus_bbox_annotations.json": "dab68b3d8bf65bbeda1a9f0c2625cc81bf458e44cde8a204a3bf33b2f4da2b0e"
+  },
+  "metrics": "project per-sample float32, float64 accumulation; not official thresholded SPEED+ scoring",
+  "source_plan": "EXPERIMENT_PLAN.md"
+}

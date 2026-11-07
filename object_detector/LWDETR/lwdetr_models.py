@@ -1,3 +1,4 @@
+from src.device import get_device
 # Clean LW-DETR implementation using local files (no external dependencies)
 
 import torch
@@ -93,7 +94,7 @@ class LWDETRWrapper(nn.Module):
         args = SimpleNamespace()
 
         # Core settings using original DETR architecture
-        args.device = "cuda" if torch.cuda.is_available() else "cpu"
+        args.device = str(get_device())
         args.num_classes = self.num_classes
         # num_queries set per variant below
         args.aux_loss = True  # Enable auxiliary losses for better training

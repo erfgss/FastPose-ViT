@@ -1,0 +1,74 @@
+[
+  {
+    "model": "baseline",
+    "domain": "all",
+    "n": 9531,
+    "translation_m": 1.0980701116763811,
+    "rotation_deg": 65.36052518423499,
+    "speed_score": 1.322783666503242
+  },
+  {
+    "model": "baseline",
+    "domain": "lightbox",
+    "n": 6740,
+    "translation_m": 1.0818724502273904,
+    "rotation_deg": 57.61456293686678,
+    "speed_score": 1.1835074491453432
+  },
+  {
+    "model": "baseline",
+    "domain": "sunlamp",
+    "n": 2791,
+    "translation_m": 1.137185926139368,
+    "rotation_deg": 84.06628854763939,
+    "speed_score": 1.659122507417695
+  },
+  {
+    "model": "full_seed123",
+    "domain": "all",
+    "n": 9531,
+    "translation_m": 1.0976229256226935,
+    "rotation_deg": 65.36023474604512,
+    "speed_score": 1.3227023845325843
+  },
+  {
+    "model": "full_seed123",
+    "domain": "lightbox",
+    "n": 6740,
+    "translation_m": 1.0813417234054548,
+    "rotation_deg": 57.61410046617681,
+    "speed_score": 1.183409158376775
+  },
+  {
+    "model": "full_seed123",
+    "domain": "sunlamp",
+    "n": 2791,
+    "translation_m": 1.1369404831089664,
+    "rotation_deg": 84.06641355160313,
+    "speed_score": 1.6590823000790391
+  },
+  {
+    "model": "selected_seed123",
+    "domain": "all",
+    "n": 9531,
+    "translation_m": 1.097659691822813,
+    "rotation_deg": 65.36041636128395,
+    "speed_score": 1.3227137127577175
+  },
+  {
+    "model": "selected_seed123",
+    "domain": "lightbox",
+    "n": 6740,
+    "translation_m": 1.0813917639865664,
+    "rotation_deg": 57.614350429819424,
+    "speed_score": 1.183424080976645
+  },
+  {
+    "model": "selected_seed123",
+    "domain": "sunlamp",
+    "n": 2791,
+    "translation_m": 1.1369451929393666,
+    "rotation_deg": 84.06643011193638,
+    "speed_score": 1.6590849482304617
+  }
+]

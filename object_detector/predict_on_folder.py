@@ -1,3 +1,4 @@
+from src.device import get_device
 # This file contains the script to run inference on a folder of images using the RF-DETR model
 
 import argparse
@@ -151,7 +152,7 @@ def predict_on_folder(
         image_extensions = ["jpg", "jpeg", "png", "bmp", "tiff"]
 
     # Setup device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     logger.info(f"Using device: {device}")
 
     # Get model configuration
@@ -258,7 +259,7 @@ def predict_on_folder(
     )
 
     # Optimize dataloader for prefetching and performance (match src/ settings)
-    use_cuda = device.type == "cuda"
+    use_pinned_memory = False
     prefetch_factor = 3 if num_workers > 0 else None
 
     dataloader = DataLoader(
@@ -266,7 +267,7 @@ def predict_on_folder(
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=use_cuda,  # Enable pinned memory for faster GPU transfer
+        pin_memory=use_pinned_memory,  # Enable pinned memory for faster GPU transfer
         drop_last=False,
         collate_fn=custom_collate_fn,
         prefetch_factor=prefetch_factor,  # Match src/ prefetch factor
@@ -275,7 +276,7 @@ def predict_on_folder(
     )
 
     logger.info(
-        f"DataLoader created with {num_workers} workers, pin_memory={'enabled' if use_cuda else 'disabled'}"
+        f"DataLoader created with {num_workers} workers, pin_memory={'enabled' if use_pinned_memory else 'disabled'}"
     )
     if prefetch_factor:
         logger.info(
@@ -292,11 +293,7 @@ def predict_on_folder(
     # Create iterator for better memory management with prefetching
     dataloader_iter = iter(dataloader)
 
-    # Create CUDA stream for async operations if using GPU
-    if use_cuda:
-        stream = torch.cuda.Stream()
-    else:
-        stream = None
+    stream = None
 
     with torch.no_grad():
         # Use enumerate with tqdm for better performance
@@ -310,24 +307,11 @@ def predict_on_folder(
                 # Unpack batch data
                 batch_images, batch_original_sizes, batch_paths, batch_names = batch_data
 
-                # Use CUDA streams for overlapping data transfer and computation
-                if use_cuda and stream is not None:
-                    with torch.cuda.stream(stream):
-                        # Use non_blocking transfer for better GPU pipeline utilization
-                        batch_images = batch_images.to(device, non_blocking=True)
-                        # Prepare input format (NestedTensor for LW-DETR)
-                        model_inputs = prepare_model_input(batch_images, model)
-                        # Run inference on batch - direct single prediction
-                        outputs = model(model_inputs)
-                    # Synchronize stream to ensure computation is complete
-                    stream.synchronize()
-                else:
-                    # Use non_blocking transfer for better GPU pipeline utilization
-                    batch_images = batch_images.to(device, non_blocking=use_cuda)
-                    # Prepare input format (NestedTensor for LW-DETR)
-                    model_inputs = prepare_model_input(batch_images, model)
-                    # Run inference on batch - direct single prediction
-                    outputs = model(model_inputs)
+                batch_images = batch_images.to(device, non_blocking=use_pinned_memory)
+                # Prepare input format (NestedTensor for LW-DETR)
+                model_inputs = prepare_model_input(batch_images, model)
+                # Run inference on batch - direct single prediction
+                outputs = model(model_inputs)
 
                 # Debug: Log output format on first batch
                 if batch_idx == 0:

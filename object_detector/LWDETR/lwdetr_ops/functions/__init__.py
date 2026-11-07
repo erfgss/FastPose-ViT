@@ -13,6 +13,5 @@ ms_deform_attn_func
 """
 
 from object_detector.LWDETR.lwdetr_ops.functions.ms_deform_attn_func import (
-    MSDeformAttnFunction as MSDeformAttnFunction,
     ms_deform_attn_core_pytorch as ms_deform_attn_core_pytorch,
 )

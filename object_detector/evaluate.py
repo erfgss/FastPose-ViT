@@ -1,3 +1,4 @@
+from src.device import get_device
 # This file contains the evaluation script for the RF-DETR model on the SPEED dataset
 
 import argparse
@@ -56,7 +57,7 @@ def evaluate_model_on_dataset(
     logger.info("Starting RF-DETR evaluation...")
 
     # Setup device - always use GPU if available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     logger.info(f"Using device: {device}")
 
     # Setup dataset paths - follow src/train.py pattern

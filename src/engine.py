@@ -1,3 +1,4 @@
+from src.geometry_decoder import forward_pose
 # This file contains the training and validation loops for the model.
 
 import logging
@@ -390,13 +391,13 @@ def train_epoch(
 
         # Forward pass with conditional autocast
         use_amp = scaler is not None
-        with autocast("cuda", enabled=use_amp):
+        with autocast(device.type, enabled=use_amp):
             if config.merge_outputs:
-                output = model(images)
+                output = forward_pose(model, images, bboxes, getattr(train_dataset, "camera", None))
                 pred_translations = output[:, :3]
                 pred_rotations = output[:, 3:]
             else:
-                pred_translations, pred_rotations = model(images)
+                pred_translations, pred_rotations = forward_pose(model, images, bboxes, getattr(train_dataset, "camera", None))
 
             # Process rotations based on loss type
             if is_6d_rotation_loss:
@@ -529,13 +530,13 @@ def val_epoch(
             rotations = rotations.to(device, non_blocking=True)
 
             # Forward pass with conditional autocast
-            with autocast("cuda", enabled=device.type == "cuda"):
+            with autocast(device.type, enabled=device.type == "npu"):
                 if config.merge_outputs:
-                    output = model(images)
+                    output = forward_pose(model, images, bboxes, val_camera)
                     pred_translations = output[:, :3]
                     pred_rotations = output[:, 3:]
                 else:
-                    pred_translations, pred_rotations = model(images)
+                    pred_translations, pred_rotations = forward_pose(model, images, bboxes, val_camera)
 
                 pred_rotations = process_rotation(pred_rotations, config.rotation_format)
 

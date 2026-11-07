@@ -41,10 +41,10 @@ class ONNXInference:
         Args:
             onnx_path: Path to the ONNX model file.
             providers: List of ONNX Runtime execution providers. Defaults to
-                CUDA with CPU fallback.
+                CPU execution.
         """
         if providers is None:
-            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+            providers = ["CPUExecutionProvider"]
 
         self.onnx_path = onnx_path
         self.providers = providers
@@ -178,7 +178,7 @@ def evaluate(args: argparse.Namespace) -> None:
             and evaluation parameters.
     """
     logger, _ = setup_logging(args=args, base_filename="evaluate_onnx_latency")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cpu")
     logger.info(f"Using device: {device}")
 
     # If log_dir does not exist, create it
@@ -221,28 +221,6 @@ def evaluate(args: argparse.Namespace) -> None:
     try:
         # Initialize ONNX model with optimal GPU acceleration
         providers = []
-        if torch.cuda.is_available():
-            # Try TensorRT execution provider first (best performance)
-            trt_provider_options = {
-                "device_id": 0,
-                "trt_max_workspace_size": 2 * 1024 * 1024 * 1024,  # 2GB
-                "trt_fp16_enable": False,
-                "trt_int8_enable": False,
-                "trt_engine_cache_enable": True,
-                "trt_timing_cache_enable": True,
-            }
-            providers.append(("TensorrtExecutionProvider", trt_provider_options))  # Fixed case
-
-            # Fallback to CUDA execution provider
-            cuda_provider_options = {
-                "device_id": 0,
-                "arena_extend_strategy": "kSameAsRequested",
-                "gpu_mem_limit": 4 * 1024 * 1024 * 1024,  # 4GB
-                "cudnn_conv_algo_search": "DEFAULT",
-                "do_copy_in_default_stream": False,
-                "cudnn_conv_use_max_workspace": True,
-            }
-            providers.append(("CUDAExecutionProvider", cuda_provider_options))
 
         providers.append("CPUExecutionProvider")
 
@@ -273,18 +251,18 @@ def evaluate(args: argparse.Namespace) -> None:
                         outputs, batch_time = onnx_model.inference(images_np, get_timing=True)
                         inference_times.append(batch_time)
 
-                        # Move ground truth to GPU
-                        translations = translations.cuda()
-                        rotations = rotations.cuda()
+                        # Move ground truth to the evaluation device
+                        translations = translations.to(device)
+                        rotations = rotations.to(device)
 
                         # Process ONNX outputs
                         if args.merge_outputs:
-                            output = torch.from_numpy(outputs["output"]).cuda()
+                            output = torch.from_numpy(outputs["output"]).to(device)
                             pred_translations = output[:, :3]
                             pred_rotations = output[:, 3:]
                         else:
-                            pred_translations = torch.from_numpy(outputs["translation"]).cuda()
-                            pred_rotations = torch.from_numpy(outputs["rotation"]).cuda()
+                            pred_translations = torch.from_numpy(outputs["translation"]).to(device)
+                            pred_rotations = torch.from_numpy(outputs["rotation"]).to(device)
 
                         # Process rotations based on format (match PyTorch evaluation exactly)
                         if args.rotation_format == "matrix" or pred_rotations.shape[1] == 6:
@@ -304,7 +282,7 @@ def evaluate(args: argparse.Namespace) -> None:
                         # Convert relative translations to absolute translations if bbox is not None
                         # Check that bbox is not made only of zeros and 1s
                         if bbox is not None and not torch.all(bbox.eq(0)):
-                            bbox = bbox.cuda()
+                            bbox = bbox.to(device)
                             pred_translations = bbox_relative_translation_to_translation(
                                 pred_translations,
                                 bbox,

@@ -5,7 +5,6 @@ import logging
 
 import onnx
 import torch
-import tensorrt as trt
 
 from src.models import FastPoseViT, SUPPORTED_VIT_MODELS, VIT_MODELS
 
@@ -21,7 +20,6 @@ def convert_to_onnx(args: argparse.Namespace) -> None:
     """Convert a PyTorch model to ONNX format.
 
     Supports both pose estimation (FastPoseViT) and object detection (LW-DETR) models.
-    Optionally converts the ONNX model to TensorRT engine if requested.
 
     Args:
         args: Command line arguments containing model configuration and paths.
@@ -40,7 +38,7 @@ def convert_to_onnx(args: argparse.Namespace) -> None:
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cpu"
 
     if args.model_type == "pose":
         # Set up the dimensions
@@ -186,7 +184,6 @@ def convert_to_onnx(args: argparse.Namespace) -> None:
                 f"Dynamo ONNX export failed for LW-DETR due to: {e.__class__.__name__}: {e}. "
                 "Falling back to legacy exporter with ATen fallback on CPU."
             )
-            # Move to CPU to avoid CUDA custom kernel tracing issues
             model_cpu = model.to("cpu")
 
             # Some LW-DETR modules cache position embeddings during export() in
@@ -228,114 +225,8 @@ def convert_to_onnx(args: argparse.Namespace) -> None:
     onnx.checker.check_model(onnx_model)
     logger.info("ONNX model exported successfully!")
 
-    # Convert to TensorRT if requested
-    if args.create_trt_engine:
-        logger.info(f"Converting ONNX to TensorRT engine: {args.trt_engine_path}")
-        convert_onnx_to_tensorrt(args, logger)
 
 
-def convert_onnx_to_tensorrt(args: argparse.Namespace, logger: logging.Logger) -> None:
-    """Convert an ONNX model to a TensorRT engine.
-
-    Uses the TensorRT Python API to parse an ONNX model and build an optimized
-    TensorRT engine with optional FP16 or INT8 precision.
-
-    Args:
-        args: Command line arguments containing ONNX path, TensorRT engine path,
-            workspace size, and precision flags (trt_fp16, trt_int8).
-        logger: Logger instance for status messages and error reporting.
-
-    Raises:
-        RuntimeError: If ONNX parsing fails or TensorRT engine build fails.
-    """
-    try:
-        # Create TensorRT logger and builder
-        trt_logger = trt.Logger(trt.Logger.INFO)
-        builder = trt.Builder(trt_logger)
-
-        # Create network and parser
-        network_flags = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
-        network = builder.create_network(network_flags)
-        parser = trt.OnnxParser(network, trt_logger)
-
-        # Parse ONNX model
-        logger.info(f"Parsing ONNX model: {args.onnx_model_path}")
-        with open(args.onnx_model_path, "rb") as model_file:
-            if not parser.parse(model_file.read()):
-                logger.error("Failed to parse ONNX model")
-                for error_idx in range(parser.num_errors):
-                    error = parser.get_error(error_idx)
-                    logger.error(f"Parser error {error_idx}: {error}")
-                raise RuntimeError("ONNX parsing failed")
-
-        logger.info(
-            f"Successfully parsed ONNX model with {network.num_inputs} inputs and {network.num_outputs} outputs"
-        )
-
-        # Log network inputs/outputs
-        for i in range(network.num_inputs):
-            input_tensor = network.get_input(i)
-            logger.info(
-                f"Input {i}: {input_tensor.name}, shape: {input_tensor.shape}, dtype: {input_tensor.dtype}"
-            )
-
-        for i in range(network.num_outputs):
-            output_tensor = network.get_output(i)
-            logger.info(
-                f"Output {i}: {output_tensor.name}, shape: {output_tensor.shape}, dtype: {output_tensor.dtype}"
-            )
-
-        # Create builder configuration
-        config = builder.create_builder_config()
-
-        # Set workspace memory limit
-        workspace_size = args.trt_workspace_size * (1 << 20)  # Convert MB to bytes
-        config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, workspace_size)
-        logger.info(f"Workspace memory limit: {args.trt_workspace_size} MB")
-
-        # Enable precision modes
-        if args.trt_fp16:
-            if builder.platform_has_fast_fp16:
-                config.set_flag(trt.BuilderFlag.FP16)
-                logger.info("FP16 precision enabled")
-            else:
-                logger.warning("FP16 not supported on this platform")
-
-        if args.trt_int8:
-            if builder.platform_has_fast_int8:
-                config.set_flag(trt.BuilderFlag.INT8)
-                logger.info("INT8 precision enabled")
-            else:
-                logger.warning("INT8 not supported on this platform")
-
-        # Build the engine
-        logger.info("Building TensorRT engine (this may take several minutes)...")
-        serialized_engine = builder.build_serialized_network(network, config)
-
-        if serialized_engine is None:
-            raise RuntimeError("Failed to build TensorRT engine")
-
-        # Save the engine
-        with open(args.trt_engine_path, "wb") as f:
-            f.write(serialized_engine)
-
-        # Get engine size from the serialized bytes
-        engine_bytes = bytes(serialized_engine)
-        engine_size_mb = len(engine_bytes) / (1024 * 1024)
-        logger.info(f"TensorRT engine saved to: {args.trt_engine_path}")
-        logger.info(f"Engine size: {engine_size_mb:.2f} MB")
-
-        # Verify the engine can be loaded
-        runtime = trt.Runtime(trt_logger)
-        engine = runtime.deserialize_cuda_engine(engine_bytes)
-        if engine is None:
-            raise RuntimeError("Failed to deserialize saved engine")
-
-        logger.info("TensorRT engine conversion completed successfully!")
-
-    except Exception as e:
-        logger.error(f"TensorRT conversion failed: {e}")
-        raise
 
 
 if __name__ == "__main__":
@@ -472,34 +363,6 @@ if __name__ == "__main__":
         help="Enable static export path (fixed integer spatial shapes) for detector",
     )
 
-    # TensorRT conversion arguments
-    parser.add_argument(
-        "--create_trt_engine",
-        action="store_true",
-        help="Convert ONNX model to TensorRT engine after ONNX export",
-    )
-    parser.add_argument(
-        "--trt_engine_path",
-        type=str,
-        default="model.trt",
-        help="Path to save the TensorRT engine file",
-    )
-    parser.add_argument(
-        "--trt_workspace_size",
-        type=int,
-        default=1024,
-        help="TensorRT workspace memory size in MB",
-    )
-    parser.add_argument(
-        "--trt_fp16",
-        action="store_true",
-        help="Enable FP16 precision for TensorRT engine",
-    )
-    parser.add_argument(
-        "--trt_int8",
-        action="store_true",
-        help="Enable INT8 precision for TensorRT engine",
-    )
 
     args = parser.parse_args()
 

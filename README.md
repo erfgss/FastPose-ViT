@@ -1,6 +1,8 @@
 # FastPose-ViT
+
+Ascend NPU: see [NPU setup and validated commands](mig_docs/working/Mig_Readme.md) and [validation summary](mig_docs/Summary.md).
 ![Front image](assets/front.png)
-FastPose-ViT is a Vision Transformer (ViT) pipeline for 6D spacecraft pose estimation on the SPEED and SPEED+ datasets. It covers the full workflow from data preparation and training to NVIDIA Jetson deployment with dedicated tooling for bounding-box detection, quantization and TensorRT conversion.
+FastPose-ViT is a Vision Transformer (ViT) pipeline for 6D spacecraft pose estimation on the SPEED and SPEED+ datasets. It covers the full workflow from data preparation and training to Ascend NPU inference with dedicated tooling for bounding-box detection, portable ONNX export.
 
 ## Table of Contents
 - [Highlights](#highlights)
@@ -8,8 +10,6 @@ FastPose-ViT is a Vision Transformer (ViT) pipeline for 6D spacecraft pose estim
 - [Quick Start](#quick-start)
 - [Pretrained Weights](#pretrained-weights)
 - [Installation](#installation)
-  - [Option 1: Docker (Recommended)](#option-1-docker-recommended)
-  - [Option 2: Manual Python Environment](#option-2-manual-python-environment)
 - [Dataset Preparation](#dataset-preparation)
   - [Steps](#steps)
   - [Directory Layout](#directory-layout)
@@ -28,7 +28,7 @@ FastPose-ViT is a Vision Transformer (ViT) pipeline for 6D spacecraft pose estim
 - 6D pose regression with configurable ViT or ConvNeXt backbones and rotation/translation losses
 - Integrated object detector (LW-DETR variants) to generate spacecraft bounding boxes
 - End-to-end optimization pipeline with ONNX export and TensorRT for Jetson Orin Nano
-- Ready-to-run Docker image as well as local setups
+- Ascend NPU and CPU execution
 
 ## Repository Layout
 - `assets/`: Figures and visual assets used across the documentation
@@ -44,7 +44,7 @@ FastPose-ViT is a Vision Transformer (ViT) pipeline for 6D spacecraft pose estim
 
 Getting started with FastPose-ViT is straightforward. Follow these essential steps to begin training and evaluating your 6D pose estimation models:
 
-1. Install the package (Docker or local Python environment)
+1. Activate the Ascend Python environment
 2. Download SPEED / SPEED+ and create train/val/test splits
 3. Train FastPose-ViT on SPEED / SPEED+
 4. Evaluate the model and export predictions or latency metrics
@@ -81,44 +81,17 @@ Then reference them when running evaluation or prediction commands, e.g.:
 
 ## Installation
 
-To get FastPose-ViT up and running, you have several options depending on your environment and requirements. We recommend the Docker approach for consistency and ease of deployment.
+Use a working Ascend CANN environment with matching torch and torch_npu versions.
+The validated environment is `.venv-npu` with torch/torch_npu 2.10.0.
 
-### Option 1: Docker (Recommended)
-**Requirements**: NVIDIA GPU with CUDA 13 capability and nvidia-cuda-toolkit installed. Tested with Ubuntu 24.04+, on A100 clusters.
-
-Build the image:
 ```bash
-docker build -t FastPose-ViT .
-```
-Run interactively with GPU access:
-```bash
-docker run --gpus all --shm-size=8g --rm -it FastPose-ViT
-```
-In practice you will want to mount your dataset and results directories:
-```bash
-docker run --gpus all --shm-size=8g --rm -it \
-  -v ./SPEED_FIXED:/app/SPEED_FIXED \
-  -v ./results:/app/results \
-  FastPose-ViT
+source .venv-npu/bin/activate
+export FASTPOSE_DEVICE=npu:0
+# Dependencies for an existing compatible framework installation:
+pip install -r requirements-npu.txt
 ```
 
-### Option 2: Manual Python Environment
-1. Install TensorRT 10.13:
-    ```bash
-    pip install --break-system-packages --system --upgrade tensorrt
-    ```
-2. Create a Python 3.12 virtual environment (venv, uv or conda)
-3. Install PyTorch first, then FastPose-ViT and its dependencies:
-   ```bash
-   pip install -r requirements-pytorch.txt
-   pip install -e .
-   ```
-4. Compile the LW-DETR CUDA extension (required for the object detector):
-   ```bash
-   cd object_detector/LWDETR/lwdetr_ops
-   chmod +x make.sh && ./make.sh
-   cd ../../..
-   ```
+`FASTPOSE_DEVICE=cpu` selects CPU validation. The detector uses portable PyTorch deformable attention and needs no compiled extension.
 
 ## Dataset Preparation
 
@@ -352,146 +325,9 @@ python3 object_detector/predict_on_folder.py \
 
 ## Optimization & Deployment
 
-For deployment on NVIDIA Jetson devices, FastPose-ViT includes a comprehensive optimization pipeline that converts models through ONNX to TensorRT engines. This section details the optimization process for both the pose estimator and object detector components.
-
-FastPose-ViT ships with tooling to export ONNX graphs, build TensorRT engines, and profile latency on Jetson-class hardware. The snippets below assume you already trained the pose estimator (`results/vit-b-16-384`) and detector (`results/bbox`).
-
-### Pose Estimator (ViT)
-
-<details>
-<summary>1. Export to ONNX</summary>
-
-```bash
-RES_DIR=results/vit-b-16-384 && \
-python3 optimization/convert_to_onnx.py \
---model_weights $RES_DIR/model.pth \
---log_dir $RES_DIR/ \
---rotation_format matrix \
---num_hidden_layers 0 \
---hidden_layer_dim 0 \
---nb_class_tokens 1 \
---vit_model vit_b_16_384 \
---merge_outputs \
---no_mlp \
---onnx_model_path $RES_DIR/model.onnx
-```
-
-</details>
-
-<details>
-<summary>2. Build the TensorRT engine</summary>
-
-(`--fp16` enables mixed precision)
-
-```bash
-RES_DIR=results/vit-b-16-384 && \
-python3 optimization/convert_onnx_to_trt.py \
---onnx_path $RES_DIR/model.onnx \
---engine_path $RES_DIR/model.trt \
---vit_model vit_b_16_384 \
---batch_size 1 \
---log_dir $RES_DIR/
-```
-
-</details>
-
-<details>
-<summary>3. Benchmark inference latency</summary>
-
-```bash
-DATASET=SPEED_FIXED && \
-RES_DIR=results/vit-b-16-384 && \
-python3 optimization/evaluate_trt_performance.py \
---trt_engine_path $RES_DIR/model.trt \
---vit_model vit_b_16_384 \
---batch_size 1 \
---log_dir $RES_DIR/ \
---output_json $RES_DIR/trt_performance_python.json \
---dataset SPEED \
---rotation_format matrix \
---dataset_root_dir $DATASET \
---merge_outputs \
---no_mlp
-```
-
-</details>
-
-### Object Detector
-
-<details>
-<summary>1. Export to ONNX</summary>
-
-```bash
-RES_DIR=results/bbox && \
-python3 optimization/convert_to_onnx.py \
---model_weights $RES_DIR/model.pth \
---log_dir $RES_DIR/ \
---onnx_model_path $RES_DIR/model.onnx \
---detector_variant small \
---model_type detector \
---static_export
-```
-
-</details>
-
-<details>
-<summary>2. Build the TensorRT engine</summary>
-
-(add `--fp16` for mixed precision)
-
-```bash
-RES_DIR=results/bbox && \
-python3 optimization/convert_onnx_to_trt.py \
---model_type detector \
---detector_variant small \
---onnx_path $RES_DIR/model.onnx \
---engine_path $RES_DIR/model.trt
-```
-
-</details>
-
-<details>
-<summary>3. Benchmark detector latency</summary>
-
-```bash
-RES_DIR=results/bbox && \
-python3 optimization/evaluate_trt_performance.py \
---mode detector \
---trt_engine_detector_path $RES_DIR/model.trt \
---detector_num_samples 500 \
---output_json $RES_DIR/trt_performance_python.json
-```
-
-</details>
-
-### End-to-End Pipeline
-
-<details>
-<summary>Evaluate both TensorRT engines in a single pass to capture end-to-end latency and post-processing overhead</summary>
-
-```bash
-DATASET=SPEED_FIXED && \
-VIT_RES_DIR=results/vit-b-16-384 && \
-OBJ_RES_DIR=results/bbox && \
-python3 optimization/evaluate_trt_performance.py \
---mode pipeline \
---trt_engine_pose_path $VIT_RES_DIR/model.trt \
---trt_engine_detector_path $OBJ_RES_DIR/model.trt \
---dataset SPEED \
---dataset_root_dir $DATASET \
---vit_model vit_b_16_384 \
---batch_size 1 \
---rotation_format matrix \
---merge_outputs \
---no_mlp \
---detector_num_samples 500 \
---num_workers 4 \
---measure_postproc \
---log_dir $VIT_RES_DIR/ \
---output_json $VIT_RES_DIR/trt_performance_both.json
-```
-
-</details>
+Generic ONNX export remains available in `optimization/convert_to_onnx.py`.
+ONNX Runtime evaluation uses its CPU provider. Native Ascend inference uses PyTorch/torch_npu.
+See `mig_docs/working/SPEED_validation.md` for real-data validation and reproduction commands.
 
 ## Tooling & Development
 
@@ -524,3 +360,15 @@ If you use FastPose-ViT in your research, please cite:
     pages     = {7873-7882}
 }
 ```
+
+
+## Optional geometry-conditioned dual-token decoder
+
+The original model remains the default baseline. Set `--pose_decoder geometry_dual_token`
+with `--rotation_format matrix` to use geometry-conditioned translation/rotation queries.
+Use `--init_backbone_only --freeze_backbone` for decoder pretraining from the supplied
+ViT checkpoint, then load the new checkpoint without those flags for joint fine-tuning.
+The complete two-stage recipe is `bash scripts/pretrain_geometry_decoder.sh`.
+See [architecture, validation and commands](mig_docs/working/Geometry_dual_token.md).
+New checkpoint files contain architecture metadata; the original baseline weights
+are unchanged. Functional NPU checks passed, but no accuracy improvement is established.

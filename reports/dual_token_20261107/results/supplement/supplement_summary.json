@@ -1,0 +1,19 @@
+{
+  "baseline_validation": {
+    "n": 1200,
+    "translation_m": 0.027032678323618407,
+    "rotation_deg": 0.4925537075296739,
+    "rotation_rad": 0.008596683939297994,
+    "relative_translation": 0.002406275951125281,
+    "speed_score": 0.011002959890423275
+  },
+  "summary": [
+    {
+      "config": "weight_decay_0p01",
+      "mean_speed": 0.010950540552942888,
+      "std_speed": 8.545573108714946e-07,
+      "change_vs_baseline_percent": -0.4764112384524122
+    }
+  ],
+  "main_selection_unchanged": true
+}

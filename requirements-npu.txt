@@ -1,0 +1,13 @@
+# Install matching torch/torch_npu supplied with CANN first. Validated torch 2.10.
+torchvision==0.25.0+cpu
+timm
+einops
+fairscale
+albumentationsx==2.0.13
+opencv-python-headless
+tensorboard
+pycocotools
+scikit-learn==1.5.2
+Pillow==10.4.0
+scipy
+tqdm

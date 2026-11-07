@@ -1,0 +1,7 @@
+{
+  "delta_full_roundtrip_exact": true,
+  "runs": 15,
+  "baseline_backbone_and_head_exact": true,
+  "no_geometry_encoder_zero": true,
+  "all_best_epochs_match_validation": true
+}

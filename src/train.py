@@ -1,22 +1,14 @@
+from src.geometry_decoder import add_decoder_arguments, decoder_kwargs
+from src.device import get_device
 # This script is used to train the FastPoseViT model on the SPEED dataset.
 
 import argparse
 import os
 import torch
 
-# Fix torch.compile Docker UID issues by setting comprehensive cache directories
-os.environ.setdefault("TORCHINDUCTOR_CACHE_DIR", "/tmp/torchinductor_cache")
-os.environ.setdefault("TRITON_CACHE_DIR", "/tmp/triton_cache")
-os.environ.setdefault("PYTORCH_TRITON_CACHE_DIR", "/tmp/triton_cache")
-# Set user environment variables to avoid getpwuid lookups
-os.environ.setdefault("USER", "pytorch")
-os.environ.setdefault("LOGNAME", "pytorch")
-os.environ.setdefault("HOME", "/tmp")
 import torch.optim as optim
-import torch._dynamo
-from torch.amp import GradScaler
+from src.device import make_grad_scaler as GradScaler
 from src.optimizer import SingleDeviceMuonWithAuxAdam
-import torch._inductor.config
 from src.datasets import SPEEDDataset, get_dataset_config
 from src.engine import train_epoch, val_epoch, TrainingConfig, ValidationConfig
 from src.losses import (
@@ -162,35 +154,9 @@ def train(args: argparse.Namespace, log_file: str, bbox_json_path: str) -> None:
         raise ValueError(f"Invalid rotation format: {args.rotation_format}")
 
     # Set up device - always use GPU if available
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device()
     logger.info(f"Using device: {device}")
 
-    # Enable cuDNN benchmark and optimizations for better performance
-    if device.type == "cuda":
-        torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.allow_tf32 = True  # Enable TF32 for better performance
-        torch.backends.cuda.matmul.allow_tf32 = True  # Enable TF32 for matrix operations
-        torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction = (
-            True  # BF16 optimizations
-        )
-        torch.set_float32_matmul_precision("medium")  # Set medium precision for matmul
-
-        # Additional CUDA optimizations
-        os.environ["CUDA_LAUNCH_BLOCKING"] = "0"  # Async kernel launches (faster)
-
-        # OpenMP settings for better performance
-        os.environ["OMP_SCHEDULE"] = "STATIC"  # Static scheduling for OpenMP
-        os.environ["OMP_PROC_BIND"] = "CLOSE"  # Bind threads to cores for better locality
-        # 8 threads is a good default for most GPUs
-        os.environ["OMP_NUM_THREADS"] = "8"
-
-        # Synchronize CUDA context but avoid cache clearing for power stability
-        torch.cuda.synchronize()
-
-        # Set memory fraction to prevent fragmentation
-        torch.cuda.set_per_process_memory_fraction(0.9)
-
-        logger.info("cuDNN benchmark, TF32 and memory optimizations enabled")
 
     # Get the image size for the ViT model
     image_size = VIT_MODELS[args.vit_model][3] if args.vit_model in VIT_MODELS else (224, 224)
@@ -209,94 +175,11 @@ def train(args: argparse.Namespace, log_file: str, bbox_json_path: str) -> None:
         dropout_rate=args.dropout_rate,
         use_residual=args.use_residual,
         no_mlp=args.no_mlp,
+        **decoder_kwargs(args),
     ).to(device)
 
     # Set basic torch inductor optimization flags (always applied for better performance)
-    if device.type == "cuda":
-        torch._inductor.config.triton.unique_kernel_names = True
-        torch._inductor.config.coordinate_descent_tuning = True
-        logger.info("Torch inductor optimization flags enabled")
 
-    # Apply torch.compile unless disabled
-    if not args.no_compile_model:
-        logger.info("Applying torch.compile optimization...")
-        logger.info("Note: First few steps will be slower due to compilation warmup")
-
-        # Simple warmup for torch.compile
-        if device.type == "cuda":
-            logger.info("Performing simple model warmup for torch.compile...")
-
-            model.eval()
-            with torch.no_grad():
-                dummy_input = torch.randn(args.batch_size, 3, *image_size, device=device)
-                logger.info(f"Warmup input shape: {dummy_input.shape}")
-
-                # Single warmup run
-                try:
-                    _ = model(dummy_input)
-                    logger.info("Model warmup successful")
-                except Exception as e:
-                    logger.warning(f"Model warmup failed: {e}")
-
-            model.train()
-            logger.info("Warmup completed")
-
-        # Use max-autotune-no-cudagraphs mode (compatible with gradient accumulation)
-        try:
-            # Enable error suppression for Docker environments
-            torch._dynamo.config.suppress_errors = True
-
-            model = torch.compile(model, mode="max-autotune")
-            logger.info(
-                "Model compiled with torch.compile (max-autotune mode + advanced optimizations)"
-            )
-
-            # Extended warmup for torch.compile to stabilize GPU power usage
-            if device.type == "cuda":
-                logger.info("Performing extended model warmup for torch.compile stability...")
-
-                model.eval()
-                with torch.no_grad():
-                    # Multiple warmup scenarios to trigger all compilation paths
-                    warmup_scenarios = [
-                        (1, "single sample"),
-                        (args.batch_size // 2, "half batch"),
-                        (args.batch_size, "full batch"),
-                    ]
-
-                    for warmup_batch_size, desc in warmup_scenarios:
-                        dummy_input = torch.randn(warmup_batch_size, 3, *image_size, device=device)
-                        logger.info(f"Warming up with {desc}: {dummy_input.shape}")
-
-                        # Multiple forward passes to ensure compilation stability
-                        for i in range(3):
-                            try:
-                                _ = model(dummy_input)
-                            except Exception as e:
-                                logger.warning(f"Warmup iteration {i + 1} failed: {e}")
-
-                    # Synchronize to ensure all kernels are compiled
-                    torch.cuda.synchronize()
-                    logger.info("Extended model warmup completed - GPU power should stabilize")
-
-                model.train()
-        except (KeyError, RuntimeError, OSError) as e:
-            if "getpwuid" in str(e) or "uid not found" in str(e):
-                logger.warning(
-                    "torch.compile failed due to Docker UID issue (getpwuid error). "
-                    "Falling back to uncompiled model. Consider running Docker with "
-                    "-e USER=pytorch -e LOGNAME=pytorch for optimal performance."
-                )
-            elif "Triton" in str(e):
-                logger.warning(
-                    f"torch.compile failed due to Triton compilation issue: {e}. "
-                    "Falling back to uncompiled model."
-                )
-            else:
-                logger.warning(
-                    f"torch.compile failed with error: {e}. Falling back to uncompiled model."
-                )
-            # Continue with uncompiled model
 
     # Create datasets and data loaders
     train_dataset = SPEEDDataset(
@@ -333,9 +216,9 @@ def train(args: argparse.Namespace, log_file: str, bbox_json_path: str) -> None:
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
-        pin_memory=device.type == "cuda",  # Only pin memory when using GPU
+        pin_memory=False,  # Only pin memory when using GPU
         persistent_workers=use_persistent_workers,
-        prefetch_factor=optimal_prefetch,
+        prefetch_factor=optimal_prefetch if args.num_workers > 0 else None,
         drop_last=True,
     )
     val_loader = DataLoader(
@@ -343,9 +226,9 @@ def train(args: argparse.Namespace, log_file: str, bbox_json_path: str) -> None:
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
-        pin_memory=device.type == "cuda",  # Only pin memory when using GPU
+        pin_memory=False,  # Only pin memory when using GPU
         persistent_workers=use_persistent_workers,
-        prefetch_factor=optimal_prefetch,
+        prefetch_factor=optimal_prefetch if args.num_workers > 0 else None,
     )
     logger.info(
         f"DataLoaders created with batch size {args.batch_size} and {args.num_workers} workers, prefetch={optimal_prefetch}, persistent={use_persistent_workers}"
@@ -381,8 +264,16 @@ def train(args: argparse.Namespace, log_file: str, bbox_json_path: str) -> None:
 
     # Load full model weights if provided
     if args.model_weights:
-        model.load_from_pretrained(args.model_weights)
+        model.load_from_pretrained(args.model_weights, backbone_only=args.init_backbone_only)
         logger.info(f"Loaded pretrained model weights from {args.model_weights}")
+
+    if args.init_backbone_only and not args.model_weights:
+        raise ValueError("--init_backbone_only requires --model_weights")
+    if args.freeze_backbone:
+        model.set_backbone_trainable(False)
+        logger.info("Backbone frozen in eval mode; pretraining the pose decoder only")
+    logger.info("Active trainable parameters: %d",
+                sum(p.numel() for p in model.parameters() if p.requires_grad))
 
     # Set up TensorBoard writer
     if args.skip_tensorboard:
@@ -413,13 +304,13 @@ def train(args: argparse.Namespace, log_file: str, bbox_json_path: str) -> None:
     if args.optimizer == "adam":
         # Use fused AdamW for better performance
         optimizer = optim.AdamW(
-            model.parameters(),
+            (p for p in model.parameters() if p.requires_grad),
             lr=scaled_max_lr,
-            fused=True if device.type == "cuda" else False,  # Use fused kernel implementation
+            fused=False,  # Use fused kernel implementation
         )
     elif args.optimizer == "muon":
         # Separate parameters for Muon using vectorized filtering
-        model_params = list(model.named_parameters())
+        model_params = [(name, p) for name, p in model.named_parameters() if p.requires_grad]
         param_tensors = [param for _, param in model_params]
         param_ndims = torch.tensor([p.ndim for p in param_tensors])
 
@@ -522,13 +413,13 @@ def train(args: argparse.Namespace, log_file: str, bbox_json_path: str) -> None:
     # Initialize mixed precision scaler with power-stability optimized settings
     scaler = (
         GradScaler(
-            device="cuda",
-            init_scale=2.0**12,  # Lower initial scale for power stability
+            device=device.type,
+            init_scale=256. if device.type == "npu" else 2.0**12,  # Lower initial scale for power stability
             growth_factor=1.5,  # Conservative growth to reduce power spikes
             backoff_factor=0.8,  # Conservative backoff
             growth_interval=1000,  # Less frequent scaling adjustments for stability
         )
-        if device.type == "cuda"
+        if device.type == "npu"
         else None
     )
     if scaler:
@@ -995,6 +886,11 @@ if __name__ == "__main__":
         help="Use per-epoch learning rate scheduling instead of per-iteration (more conservative, may help convergence)",
     )
 
+    parser.add_argument("--init_backbone_only", action="store_true",
+                        help="Initialize only backbone from --model_weights for a new decoder")
+    parser.add_argument("--freeze_backbone", action="store_true",
+                        help="Pretrain only the pose decoder; omit to jointly fine-tune")
+    add_decoder_arguments(parser)
     args = parser.parse_args()
 
     # Validate bbox_crop_percent

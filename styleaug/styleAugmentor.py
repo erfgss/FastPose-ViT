@@ -1,3 +1,4 @@
+from src.device import get_device
 import torch
 import torch.nn as nn
 
@@ -6,7 +7,7 @@ from .stylePredictor import StylePredictor
 import numpy as np
 from os.path import join, dirname
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = get_device()
 
 
 class StyleAugmentor(nn.Module):

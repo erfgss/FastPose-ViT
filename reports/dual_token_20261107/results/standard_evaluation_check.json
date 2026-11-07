@@ -1,0 +1,28 @@
+{
+  "standard_selected_metrics": {
+    "translation_metric": 0.022793330252170563,
+    "rotation_metric": 0.007839296944439411,
+    "total_metric": 0.0306326262652874,
+    "relative_translation_metric": 0.0021130794193595648,
+    "relative_total_metric": 0.009952375665307045
+  },
+  "standard_baseline_metrics": {
+    "translation_metric": 0.023077290505170822,
+    "rotation_metric": 0.007838906720280647,
+    "total_metric": 0.03091619722545147,
+    "relative_translation_metric": 0.0021362374536693096,
+    "relative_total_metric": 0.00997514370828867
+  },
+  "all1200_ground_truth_identical": true,
+  "float64_quaternion_metric_audit": {
+    "baseline": {
+      "speed_score": 0.01000072009693098,
+      "rotation_rad": 0.007864482659119548
+    },
+    "selected": {
+      "speed_score": 0.009979652220686079,
+      "rotation_rad": 0.007866572885317306
+    }
+  },
+  "selected_sha256": "d850b17d0f6512de750ff53d0e849b67aa64a272a18740f101ee83234691d1d1"
+}
